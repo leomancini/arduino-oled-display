@@ -35,6 +35,7 @@
 #define SCREEN_HEIGHT   64
 #define OLED_RESET      -1
 #define SCREEN_ADDRESS  0x3C
+#define LED_001            14
 
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 
@@ -50,7 +51,8 @@ String dataArr[3];
 
 void setup() {
   Serial.begin(115200);
-
+  
+  /* DATA */
   WiFi.begin(ssid, password);
   Serial.println("Connecting");
   while(WiFi.status() != WL_CONNECTED) {
@@ -63,18 +65,23 @@ void setup() {
  
   Serial.println("Timer set to 5 seconds (timerDelay variable), it will take 5 seconds before publishing the first reading.");
   
+  /* DISPLAY */
   if(!display.begin(SSD1306_SWITCHCAPVCC, SCREEN_ADDRESS)) {
     Serial.println(F("SSD1306 allocation failed"));
     for(;;);
   }
  
   display.display();
+
+  /* LED */
+  pinMode(LED_001, OUTPUT); 
 }
 
 void loop() {
   if ((millis() - lastTime) > timerDelay) {
-    if(WiFi.status()== WL_CONNECTED){
-              
+    if(WiFi.status() == WL_CONNECTED){
+
+      /* DATA */
       data = httpGETRequest(dataURL);
       Serial.println(data);
       JSONVar json = JSON.parse(data);
@@ -89,17 +96,28 @@ void loop() {
     
       JSONVar keys = json.keys();
 
-      String jsonString = JSON.stringify(json["display"]);
-      
+      /* DISPLAY */
+      String jsonString = JSON.stringify(json["display"]["text"]);
       jsonString.replace("<br>", "\n");
       jsonString.replace("\"", "");
 
       Serial.println(jsonString);
       
-      printDisplay(jsonString);
+      printDisplay(jsonString, json["display"]["size"]);
+
+      /* LED */
+      String led1Status = JSON.stringify(json["led"]["1"]);
+      led1Status.replace("\"", "");
+      
+      if (led1Status == "on") {
+        digitalWrite(LED_001, HIGH);
+      } else if (led1Status == "off") {
+        digitalWrite(LED_001, LOW);
+      }
     } else {
       Serial.println("WiFi Disconnected");
     }
+    
     lastTime = millis();
   }
 }
@@ -128,11 +146,11 @@ String httpGETRequest(const char* dataURL) {
   return payload;
 }
 
-void printDisplay(String string) {
+void printDisplay(String string, int size) {
   display.clearDisplay();
 
   display.setCursor(0,0);
-  display.setTextSize(2);
+  display.setTextSize(size);
   display.setTextColor(SSD1306_WHITE);
   display.println(string);
   
